@@ -5,46 +5,43 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*" }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
 let onlineUsers = 0;
+let usersMap = {}; // لحفظ أسماء المتصلين
 
 io.on('connection', (socket) => {
     onlineUsers++;
     io.emit('updateUserCount', onlineUsers);
 
+    socket.on('registerUser', (username) => {
+        usersMap[socket.id] = username;
+    });
+
     socket.on('chatMessage', (data) => {
         io.emit('chatMessage', {
             id: socket.id,
+            sender: data.sender || 'مجهول',
             text: data.text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
     });
 
-    socket.on('typing', (isTyping) => {
-        socket.broadcast.emit('typingStatus', { id: socket.id, isTyping });
+    socket.on('typing', (data) => {
+        socket.broadcast.emit('typingStatus', { isTyping: data.isTyping, user: data.user });
     });
 
-    socket.on('callUser', (data) => {
-        socket.broadcast.emit('incomingCall', { from: socket.id, signal: data.signalData });
-    });
-
-    socket.on('answerCall', (data) => {
-        io.to(data.to).emit('callAccepted', data.signal);
-    });
-
-    socket.on('endCall', () => {
-        socket.broadcast.emit('callEnded');
+    // إرسال إشارة لتفعيل نغمة الرنين عند الجميع
+    socket.on('playRingToAll', () => {
+        socket.broadcast.emit('triggerRing');
     });
 
     socket.on('disconnect', () => {
         onlineUsers--;
+        delete usersMap[socket.id];
         io.emit('updateUserCount', onlineUsers);
-        socket.broadcast.emit('callEnded');
     });
 });
 
