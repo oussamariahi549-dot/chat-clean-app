@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دردشة الأصدقاء السرية</title>
+    <style>
+        :root { --main-color: #075e54; --bg-color: #ece5dd; }
+        body { font-family: Arial, sans-serif; margin: 0; background: var(--bg-color); display: flex; flex-direction: column; height: 100vh; }
+        .header { background: var(--main-color); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .status-container { display: flex; align-items: center; gap: 10px; }
+        .call-btn { background: #25d366; border: none; color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; }
+        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 75%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; word-wrap: break-word; }
+        .message.sent { background: #dcf8c6; align-self: flex-start; border-top-left-radius: 0; }
+        .message.received { background: white; align-self: flex-end; border-top-right-radius: 0; }
+        .time { font-size: 0.7rem; color: #777; margin-top: 5px; text-align: left; }
+        .typing-indicator { padding: 5px 20px; color: #555; font-style: italic; font-size: 0.85rem; min-height: 20px; }
+        .footer { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; }
+        .input-field { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 25px; outline: none; }
+        .send-btn { background: var(--main-color); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span>💬 دردشة الأصدقاء السرية</span>
+        <div class="status-container">
+            <span id="user-count">📞 المتصلون: 1</span>
+            <button class="call-btn" onclick="alert('جاري بدء الاتصال...')">📞 اتصال</button>
+        </div>
+    </div>
+    <div class="chat-box" id="chat-box"></div>
+    <div class="typing-indicator" id="typing-indicator"></div>
+    <div class="footer">
+        <input type="text" id="msg-input" class="input-field" placeholder="اكتب رسالة سرية..." oninput="handleTyping()">
+        <button class="send-btn" onclick="sendMessage()">🚀</button>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const chatBox = document.getElementById('chat-box');
+        const msgInput = document.getElementById('msg-input');
+        const userCount = document.getElementById('user-count');
+        const typingIndicator = document.getElementById('typing-indicator');
+        let typingTimeout;
+
+        socket.on('updateUserCount', (count) => { userCount.innerText = `📞 المتصلون: ${count}`; });
+
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if (text) {
+                socket.emit('chatMessage', { text });
+                msgInput.value = '';
+                socket.emit('typing', false);
+            }
+        }
+
+        // إشعار بالكتابة
+        function handleTyping() {
+            socket.emit('typing', true);
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => { socket.emit('typing', false); }, 2000);
+        }
+
+        socket.on('typingStatus', (data) => {
+            typingIndicator.innerText = data.isTyping ? "جاري الكتابة..." : "";
+        });
+
+        socket.on('chatMessage', (data) => {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', data.id === socket.id ? 'sent' : 'received');
+            msgDiv.innerHTML = `<div>${data.text}</div><div class="time">${data.time} ✓✓</div>`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    </script>
+</body>
+</html>
